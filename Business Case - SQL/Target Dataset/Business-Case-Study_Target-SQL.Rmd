@@ -1,0 +1,131 @@
+---
+title: 'Business Case: Target SQL'
+subtitle: 'Scaler DS ML'
+author: 'Shayantan Dey'
+date: 'Sat 20th July'
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  html_notebook: default
+---
+
+### Context:
+
+Target is a globally renowned brand and a prominent retailer in the United States. Target makes itself a preferred shopping destination by offering outstanding value, inspiration, innovation and an exceptional guest experience that no other retailer can deliver.
+
+This particular business case focuses on the operations of Target in Brazil and provides insightful information about 100,000 orders placed between 2016 and 2018. The dataset offers a comprehensive view of various dimensions including the order status, price, payment and freight performance, customer location, product attributes, and customer reviews.
+
+By analyzing this extensive dataset, it becomes possible to gain valuable insights into Target's operations in Brazil. The information can shed light on various aspects of the business, such as order processing, pricing strategies, payment and shipping efficiency, customer demographics, product characteristics, and customer satisfaction levels.
+
+### Dataset:
+
+The data is available in 8 csv files at [Google Drive](https://drive.google.com/drive/folders/1TGEc66YKbD443nslRi1bWgVd238gJCnb)
+
+1. customers.csv  
+2. sellers.csv  
+3. order_items.csv  
+4. geolocation.csv  
+5. payments.csv  
+6. reviews.csv  
+7. orders.csv  
+8. products.csv  
+
+The column description for these csv files is given below.
+
+The **customers.csv** contain following features:
+
+```{r echo = FALSE, results = TRUE}
+Code  <- c("`dnorm(x, mean, sd)`","`pnorm(q, mean, sd)`","`qnorm(p, mean, sd)`","`rnorm(n, mean, sd)`")
+Name <- c("probability density function", "cumulative distribution function", "quantile function", "random number generator")
+d <- data.frame(Code, Name)
+knitr::kable(d)
+```
+
+The **sellers.csv** contains following features:
+
+```{r echo = FALSE, results = TRUE}
+Code  <- c("`dnorm(x, mean, sd)`","`pnorm(q, mean, sd)`","`qnorm(p, mean, sd)`","`rnorm(n, mean, sd)`")
+Name <- c("probability density function", "cumulative distribution function", "quantile function", "random number generator")
+d <- data.frame(Code, Name)
+knitr::kable(d)
+```
+
+### Dataset schema:
+
+![](dbDiag.png)
+
+```{r defineconnection, include=FALSE}
+library(RSQLite)
+library(DBI)
+library(knitr)
+library(kableExtra)
+target_db <- dbConnect(RSQLite::SQLite(), "Target")
+```
+
+```{sql eval=FALSE, connection=target_db, include=FALSE}
+DROP TABLE IF EXISTS sellers;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS order_reviews;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS geolocation;
+DROP TABLE IF EXISTS customers;
+```
+
+```{r writebacktodb, eval=FALSE, include=FALSE}
+sellers <- read.csv("sellers.csv", stringsAsFactors = FALSE)
+products <- read.csv("products.csv", stringsAsFactors = FALSE)
+payments <- read.csv("payments.csv", stringsAsFactors = FALSE)
+orders <- read.csv("orders.csv", stringsAsFactors = FALSE)
+order_reviews <- read.csv("order_reviews.csv", stringsAsFactors = FALSE)
+order_items <- read.csv("order_items.csv", stringsAsFactors = FALSE)
+geolocation <- read.csv("geolocation.csv", stringsAsFactors = FALSE)
+customers <- read.csv("customers.csv", stringsAsFactors = FALSE)
+
+dbWriteTable(target_db, "sellers", sellers, append = TRUE)
+dbWriteTable(target_db, "products", products, append = TRUE)
+dbWriteTable(target_db, "payments", payments, append = TRUE)
+dbWriteTable(target_db, "orders", orders, append = TRUE)
+dbWriteTable(target_db, "order_reviews", order_reviews, append = TRUE)
+dbWriteTable(target_db, "order_items", order_items, append = TRUE)
+dbWriteTable(target_db, "geolocation", geolocation, append = TRUE)
+dbWriteTable(target_db, "customers", customers, append = TRUE)
+```
+
+
+### Problem Statement:
+
+Assuming you are a data analyst/ scientist at Target, you have been assigned the task of analyzing the given dataset to extract valuable insights and provide actionable recommendations.
+
+**What does 'good' look like?**
+
+**1. Import the dataset and do usual exploratory analysis steps like checking the structure & characteristics of the dataset:**
+
+1.1. Data type of all columns in the "customers" table.
+
+```{sql, connection=target_db}
+PRAGMA table_info(customers);
+```
+
+1.2. Get the time range between which the orders were placed.
+
+```{sql, connection=target_db}
+SELECT 
+    MIN(order_purchase_timestamp) AS order_start_date, 
+    MAX(order_purchase_timestamp) AS order_end_date,
+    ROUND((julianday(MAX(order_purchase_timestamp)) - 
+      julianday(MIN(order_purchase_timestamp))), 2) AS order_time_range_days
+FROM 
+    orders;
+```
+     
+1.3. Count the Cities & States of customers who ordered during the given period.
+
+```{sql, connection=target_db}
+SELECT * FROM orders LIMIT 10;
+```
+
+
+

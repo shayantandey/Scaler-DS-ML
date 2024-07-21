@@ -1,0 +1,46 @@
+---
+title: "Business Case: Target SQL"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Creating the dataset in the databse by:
+1. Creating the database named Target
+2. Uploading the CSV files to the Target database as tables
+
+```{r}
+target_db <- dbConnect(RSQLite::SQLite(), "Target")
+
+sellers <- read.csv("sellers.csv", stringsAsFactors = FALSE)
+products <- read.csv("products.csv", stringsAsFactors = FALSE)
+payments <- read.csv("payments.csv", stringsAsFactors = FALSE)
+orders <- read.csv("orders.csv", stringsAsFactors = FALSE)
+order_reviews <- read.csv("order_reviews.csv", stringsAsFactors = FALSE)
+order_items <- read.csv("order_items.csv", stringsAsFactors = FALSE)
+geolocation <- read.csv("geolocation.csv", stringsAsFactors = FALSE)
+customers <- read.csv("customers.csv", stringsAsFactors = FALSE)
+
+dbWriteTable(target_db, "sellers", sellers, append = TRUE)
+dbWriteTable(target_db, "products", products, append = TRUE)
+dbWriteTable(target_db, "payments", payments, append = TRUE)
+dbWriteTable(target_db, "orders", orders, append = TRUE)
+dbWriteTable(target_db, "order_reviews", order_reviews, append = TRUE)
+dbWriteTable(target_db, "order_items", order_items, append = TRUE)
+dbWriteTable(target_db, "geolocation", geolocation, append = TRUE)
+dbWriteTable(target_db, "customers", customers, append = TRUE)
+```
+
+```{r}
+
+```
+
+```{r}
+dbGetQuery(target_db, "SELECT * FROM products LIMIT 10;")
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

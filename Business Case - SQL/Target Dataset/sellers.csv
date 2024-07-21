@@ -1,0 +1,1 @@
+"""Features""","""Description""","""customer_id""","""ID of the consumer who made the purchase""","""customer_unique_id""","""Unique ID of the consumer""","""customer_zip_code_prefix""","""Zip Code of consumer’s location""","""customer_city""","""Name of the City from where order is made""","""customer_state""","""State Code from where order is made (Eg. são paulo - SP)"""

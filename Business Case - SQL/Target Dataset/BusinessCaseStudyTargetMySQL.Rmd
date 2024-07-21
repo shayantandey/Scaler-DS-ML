@@ -1,0 +1,199 @@
+---
+title: 'Business Case: Target SQL'
+subtitle: 'Scaler DS ML'
+author: 'Shayantan Dey'
+date: 'Sat 20th July'
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  html_notebook: default
+---
+
+```{r defineconnection, include=FALSE}
+library(RMySQL)
+library(RSQLite)
+library(DBI)
+library(knitr)
+library(kableExtra)
+
+con <- dbConnect(RMySQL::MySQL(),
+                 dbname = "your_database_name",
+                 host = ,
+                 port = 3306,  # Default MySQL port
+                 user = "your_username",
+                 password = "your_password")
+```
+
+### Context:
+
+Target is a globally renowned brand and a prominent retailer in the United States. Target makes itself a preferred shopping destination by offering outstanding value, inspiration, innovation and an exceptional guest experience that no other retailer can deliver.
+
+This particular business case focuses on the operations of Target in Brazil and provides insightful information about 100,000 orders placed between 2016 and 2018. The dataset offers a comprehensive view of various dimensions including the order status, price, payment and freight performance, customer location, product attributes, and customer reviews.
+
+By analyzing this extensive dataset, it becomes possible to gain valuable insights into Target's operations in Brazil. The information can shed light on various aspects of the business, such as order processing, pricing strategies, payment and shipping efficiency, customer demographics, product characteristics, and customer satisfaction levels.
+
+### Dataset:
+
+The data is available in 8 csv files at [Google Drive](https://drive.google.com/drive/folders/1TGEc66YKbD443nslRi1bWgVd238gJCnb)
+
+1. customers.csv  
+2. sellers.csv  
+3. order_items.csv  
+4. geolocation.csv  
+5. payments.csv  
+6. reviews.csv  
+7. orders.csv  
+8. products.csv  
+
+The column description for these csv files is given below.
+
+The **customers.csv** contain following features:
+
+```{r echo = FALSE, results = TRUE}
+Features  <- c("customer_id","customer_unique_id","customer_zip_code_prefix","customer_city","customer_state")
+Description <- c("ID of the consumer who made the purchase","Unique ID of the consumer","Zip Code of consumer’s location","Name of the City from where order is made","State Code from where order is made (Eg. são paulo - SP)")
+d <- data.frame(Features, Description)
+knitr::kable(d) %>%
+  kable_styling(position = "left")
+```
+
+The **sellers.csv** contains following features:
+
+```{r echo = FALSE, results = TRUE}
+Features  <- c("seller_id","seller_zip_code_prefix","seller_city","seller_state")
+Description <- c("Unique ID of the seller registered","Zip Code of the seller’s location","Name of the City of the seller","State Code (Eg. são paulo - SP)")
+d <- data.frame(Features, Description)
+knitr::kable(d) %>%
+  kable_styling(position = "left")
+```
+
+The **order_items.csv** contain following features:
+
+```{r echo = FALSE, results = TRUE}
+Features  <- c("order_id","order_item_id","product_id","seller_id","shipping_limit_date","price","freight_value")
+Description <- c("A Unique ID of order made by the consumers","A Unique ID given to each item ordered in the order","A Unique ID given to each product available on the site","Unique ID of the seller registered in Target","The date before which the ordered product must be shipped","Actual price of the products ordered","Price rate at which a product is delivered from one point to another")
+d <- data.frame(Features, Description)
+knitr::kable(d) %>%
+  kable_styling(position = "left")
+```
+
+The **geolocations.csv** contain following features:
+
+```{r echo = FALSE, results = TRUE}
+Features  <- c("geolocation_zip_code_prefix","geolocation_lat","geolocation_lng","geolocation_city","geolocation_state")
+Description <- c("First 5 digits of Zip Code","Latitude","Longitude","City","State")
+d <- data.frame(Features, Description)
+knitr::kable(d) %>%
+  kable_styling(position = "left")
+```
+
+The **payments.csv** contain following features:
+
+```{r echo = FALSE, results = TRUE}
+Features  <- c("order_id","payment_sequential","payment_type","payment_installments","payment_value")
+Description <- c("A Unique ID of order made by the consumers","Sequences of the payments made in case of EMI","Mode of payment used (Eg. Credit Card)","Number of installments in case of EMI purchase","Total amount paid for the purchase order")
+d <- data.frame(Features, Description)
+knitr::kable(d) %>%
+  kable_styling(position = "left")
+```
+
+The **orders.csv** contain following features:
+
+```{r echo = FALSE, results = TRUE}
+Features  <- c("order_id","customer_id","order_status","order_purchase_timestamp","order_delivered_carrier_date","order_delivered_customer_date","order_estimated_delivery_date")
+Description <- c("A Unique ID of order made by the consumers","ID of the consumer who made the purchase","Status of the order made i.e. delivered, shipped, etc.","Timestamp of the purchase","Delivery date at which carrier made the delivery","Date at which customer got the product","Estimated delivery date of the products")
+d <- data.frame(Features, Description)
+knitr::kable(d) %>%
+  kable_styling(position = "left")
+```
+
+The **reviews.csv** contain following features:
+
+```{r echo = FALSE, results = TRUE}
+Features  <- c("review_id","order_id","review_score","review_comment_title","review_comment_message","review_creation_date","review_answer_timestamp")
+Description <- c("ID of the review given on the product ordered by the order id","A Unique ID of order made by the consumers","Review score given by the customer for each order on a scale of 1-5","Title of the review","Review comments posted by the consumer for each order","Timestamp of the review when it is created","Timestamp of the review answered")
+d <- data.frame(Features, Description)
+knitr::kable(d) %>%
+  kable_styling(position = "left")
+```
+
+The **products.csv** contain following features:
+
+```{r echo = FALSE, results = TRUE}
+Features  <- c("product_id","product_category_name","product_name_lenght","product_description_lenght","product_photos_qty","product_weight_g","product_length_cm","product_height_cm","product_width_cm")
+Description <- c("A Unique identifier for the proposed project","Name of the product category","Length of the string which specifies the name given to the products ordered","Length of the description written for each product ordered on the site","Number of photos of each product ordered available on the shopping portal","Weight of the products ordered in grams","Length of the products ordered in centimeters","Height of the products ordered in centimeters","Width of the product ordered in centimeters")
+d <- data.frame(Features, Description)
+knitr::kable(d) %>%
+  kable_styling(position = "left")
+```
+
+### Dataset schema:
+
+![](dbDiag.png)
+
+
+```{sql eval=FALSE, connection=target_db, include=FALSE}
+DROP TABLE IF EXISTS sellers;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS order_reviews;
+DROP TABLE IF EXISTS order_items;
+DROP TABLE IF EXISTS geolocation;
+DROP TABLE IF EXISTS customers;
+```
+
+```{r writebacktodb, eval=FALSE, include=FALSE}
+sellers <- read.csv("sellers.csv", stringsAsFactors = FALSE)
+products <- read.csv("products.csv", stringsAsFactors = FALSE)
+payments <- read.csv("payments.csv", stringsAsFactors = FALSE)
+orders <- read.csv("orders.csv", stringsAsFactors = FALSE)
+order_reviews <- read.csv("order_reviews.csv", stringsAsFactors = FALSE)
+order_items <- read.csv("order_items.csv", stringsAsFactors = FALSE)
+geolocation <- read.csv("geolocation.csv", stringsAsFactors = FALSE)
+customers <- read.csv("customers.csv", stringsAsFactors = FALSE)
+
+dbWriteTable(target_db, "sellers", sellers, append = TRUE)
+dbWriteTable(target_db, "products", products, append = TRUE)
+dbWriteTable(target_db, "payments", payments, append = TRUE)
+dbWriteTable(target_db, "orders", orders, append = TRUE)
+dbWriteTable(target_db, "order_reviews", order_reviews, append = TRUE)
+dbWriteTable(target_db, "order_items", order_items, append = TRUE)
+dbWriteTable(target_db, "geolocation", geolocation, append = TRUE)
+dbWriteTable(target_db, "customers", customers, append = TRUE)
+```
+
+
+### Problem Statement:
+
+Assuming you are a data analyst/ scientist at Target, you have been assigned the task of analyzing the given dataset to extract valuable insights and provide actionable recommendations.
+
+**What does 'good' look like?**
+
+**1. Import the dataset and do usual exploratory analysis steps like checking the structure & characteristics of the dataset:**
+
+1.1. Data type of all columns in the "customers" table.
+
+```{sql, connection=target_db}
+PRAGMA table_info(customers);
+```
+
+1.2. Get the time range between which the orders were placed.
+
+```{sql, connection=target_db}
+SELECT 
+    MIN(order_purchase_timestamp) AS order_start_date, 
+    MAX(order_purchase_timestamp) AS order_end_date,
+    ROUND((julianday(MAX(order_purchase_timestamp)) - 
+      julianday(MIN(order_purchase_timestamp))), 2) AS order_time_range_days
+FROM 
+    orders;
+```
+     
+1.3. Count the Cities & States of customers who ordered during the given period.
+
+
+
+
+
