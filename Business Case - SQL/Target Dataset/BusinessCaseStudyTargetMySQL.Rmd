@@ -2,7 +2,7 @@
 title: 'Business Case: Target SQL'
 subtitle: 'Scaler DS ML'
 author: 'Shayantan Dey'
-date: 'Sat 20th July'
+date: 'Sun 21st July'
 output:
   pdf_document: default
   html_document:
@@ -12,17 +12,15 @@ output:
 
 ```{r defineconnection, include=FALSE}
 library(RMySQL)
-library(RSQLite)
-library(DBI)
 library(knitr)
 library(kableExtra)
 
-con <- dbConnect(RMySQL::MySQL(),
-                 dbname = "your_database_name",
-                 host = ,
+target_db <- dbConnect(RMySQL::MySQL(),
+                 dbname = "Target",
+                 host = "172.17.0.2",
                  port = 3306,  # Default MySQL port
-                 user = "your_username",
-                 password = "your_password")
+                 user = "root",
+                 password = "password")
 ```
 
 ### Context:
