@@ -159,6 +159,13 @@ columns are in string format and not properly parsed as datetime objects.
 
 **Issues Identified in the geolocation.csv file:**  
 
+*Encoding Issue:* The file had to be read with ISO-8859-1 encoding instead of UTF-8.  
+
+*Null Values:* The review_comment_title column has many null values.  
+
+*Date and Time Formatting:* The review_creation_date and review_answer_timestamp
+columns are in string format and not properly parsed as datetime objects.  
+
 *Steps to Correct Issues:*  
 
 1. Special characters in text fields.  
@@ -202,13 +209,113 @@ FROM
 1.3. Count the Cities & States of customers who ordered during the given period.
 
 ```{sql, connection=target_db}
-SELECT 
-    MIN(order_purchase_timestamp) AS order_start_date, 
-    MAX(order_purchase_timestamp) AS order_end_date,
-    DATEDIFF(MAX(order_purchase_timestamp), MIN(order_purchase_timestamp)) 
-      AS order_time_range_days
-FROM 
-    orders;
+SELECT DISTINCT c.customer_city, c.customer_state, COUNT(*) AS customer_count
+FROM orders AS o
+JOIN customers AS c
+ON o.customer_id = c.customer_id
+GROUP BY c.customer_city, c.customer_state
+ORDER BY customer_count DESC
+    
 ```
 
+**2. In-depth Exploration:**  
 
+2.1 Is there a growing trend in the no. of orders placed over the past years?  
+
+The purchases were made in the year 2016, 2017 and 2018.
+
+```{sql, connection=target_db}
+SELECT DISTINCT YEAR(order_purchase_timestamp) AS year_of_orders
+FROM orders
+ORDER BY year_of_orders;
+```
+
+Trend for 2016 does not show conclusive evidence of a growing trend.
+
+```{sql, connection=target_db}
+SELECT DISTINCT MONTHNAME(order_purchase_timestamp) as month,
+       MONTH(order_purchase_timestamp) as month_number,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2016 AND LOWER(order_status) <> 'canceled'
+ORDER BY MONTH(order_purchase_timestamp);
+```
+
+Trend for 2017 shows growth in month-on-month sale throughout the year.
+
+```{sql, connection=target_db}
+SELECT DISTINCT MONTHNAME(order_purchase_timestamp) as month,
+       MONTH(order_purchase_timestamp) as month_number,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2017 AND LOWER(order_status) <> 'canceled'
+ORDER BY MONTH(order_purchase_timestamp);
+```
+
+Trend for 2018 shows growth in month-on-month sale throughout the year.
+
+```{sql, connection=target_db}
+SELECT DISTINCT MONTHNAME(order_purchase_timestamp) as month,
+       MONTH(order_purchase_timestamp) as month_number,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2018 AND LOWER(order_status) <> 'canceled'
+ORDER BY MONTH(order_purchase_timestamp);
+```
+
+Finding the sales per year shows a year-on-year growing trend.
+
+```{sql, connection=target_db}
+SELECT DISTINCT YEAR(order_purchase_timestamp) AS year,
+       COUNT(order_id) OVER(PARTITION BY YEAR(order_purchase_timestamp)) 
+          AS count_of_orders
+FROM orders;
+```
+
+2. Can we see some kind of monthly seasonality in terms of the no. of orders being placed?
+
+Highest monthly sales in the given data is as follows, but it fails to show any seasonal trend:
+
+```{sql, connection=target_db}
+SELECT YEAR(order_purchase_timestamp) as year,
+       MONTHNAME(order_purchase_timestamp) as month,
+       COUNT(*) as order_count
+FROM orders
+GROUP BY year, month
+ORDER BY order_count DESC;
+```
+
+While checking the year-wise monthly sales data, we do not see any monthly seasonality:
+
+```{sql, connection=target_db}
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2016") as month,
+       MONTH(order_purchase_timestamp) as month_number,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2016 AND LOWER(order_status) <> 'canceled'
+ORDER BY order_count DESC;
+```
+
+```{sql, connection=target_db}
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2017") as month,
+       MONTH(order_purchase_timestamp) as month_number,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2017 AND LOWER(order_status) <> 'canceled'
+ORDER BY order_count DESC;
+```
+
+```{sql, connection=target_db}
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2018") as month,
+       MONTH(order_purchase_timestamp) as month_number,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2018 AND LOWER(order_status) <> 'canceled'
+ORDER BY order_count DESC;
+```
