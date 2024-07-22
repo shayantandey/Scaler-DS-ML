@@ -275,7 +275,7 @@ SELECT DISTINCT YEAR(order_purchase_timestamp) AS year,
 FROM orders;
 ```
 
-2. Can we see some kind of monthly seasonality in terms of the no. of orders being placed?
+2.2. Can we see some kind of monthly seasonality in terms of the no. of orders being placed?
 
 Highest monthly sales in the given data is as follows, but it fails to show any seasonal trend:
 
@@ -319,3 +319,10 @@ FROM orders
 WHERE YEAR(order_purchase_timestamp) = 2018 AND LOWER(order_status) <> 'canceled'
 ORDER BY order_count DESC;
 ```
+
+2.3. During what time of the day, do the Brazilian customers mostly place their orders? (Dawn, Morning, Afternoon or Night)
+0-6 hrs : Dawn  
+7-12 hrs : Mornings  
+13-18 hrs : Afternoon  
+19-23 hrs : Night  
+
