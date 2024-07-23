@@ -471,23 +471,46 @@ You can calculate the delivery time and the difference between the estimated & a
 time_to_deliver = order_delivered_customer_date - order_purchase_timestamp  
 diff_estimated_delivery = order_delivered_customer_date - order_estimated_delivery_date  
 
-The following are the order_status in the dataset.
+Checking for the missing values, we find that *order_delivered_customer_date* is  
+is missing in the dataset for many rows across all *order_status*. This should be  
+considered as unclean data and it will adversely affect the analysis.
 
 ```{sql, connection=target_db}
-SELECT DISTINCT order_status
-FROM orders
+SELECT DISTINCT order_status,
+       COUNT(CASE WHEN order_delivered_customer_date = "" THEN 1 END)
+          OVER (PARTITION BY order_status ORDER BY order_delivered_customer_date)
+              AS null_delivered_date,
+       COUNT(CASE WHEN order_purchase_timestamp = "" THEN 1 END)
+          OVER (PARTITION BY order_status ORDER BY order_purchase_timestamp)
+              AS null_purchase_timestamp,
+       COUNT(CASE WHEN order_estimated_delivery_date = "" THEN 1 END)
+          OVER (PARTITION BY order_status ORDER BY order_estimated_delivery_date)
+              AS null_estimated_delivery
+FROM orders;
 ```
 
-We will consider the *delivered* order_status, for calculating *time_to_deliver*,  
-because *order_delivered_customer_date* does not exist for the other *order_status*.
+Calculating *time_to_deliver* and *diff_estimated_delivery*, we observe that  
+time to deliver and estimated delivery are a major concern that requires improvement.
 
 ```{sql, connection=target_db}
-SELECT order_delivered_customer_date
+SELECT order_id, order_status,
+       DATEDIFF(order_delivered_customer_date, order_purchase_timestamp)
+          AS time_to_deliver,
+       DATEDIFF(order_delivered_customer_date, order_estimated_delivery_date)
+          AS diff_estimated_delivery
 FROM orders
-WHERE order_status IN (
-  SELECT DISTINCT order_status
-  FROM orders
-  WHERE order_status <> 'delivered'
-)
+ORDER BY diff_estimated_delivery DESC;
 ```
+
+345 orders had actual delivery more than 30 days later than the estimated delivery.  
+Estimation of delivery date should be revised.
+
+```{sql, connection=target_db}
+SELECT COUNT(*) as delivery_estimate_miss_30_days
+FROM orders
+WHERE DATEDIFF(order_delivered_customer_date, order_estimated_delivery_date) > 30;
+```
+
+5.2. Find out the top 5 states with the highest & lowest average freight value.  
+
 
