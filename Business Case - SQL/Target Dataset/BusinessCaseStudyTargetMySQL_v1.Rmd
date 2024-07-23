@@ -17,7 +17,7 @@ library(kableExtra)
 
 target_db <- dbConnect(RMySQL::MySQL(),
                  dbname = "Target",
-                 host = "172.17.0.2",
+                 host = "172.18.0.2",
                  port = 3306,  # Default MySQL port
                  user = "root",
                  password = "password")
@@ -179,6 +179,8 @@ columns are in string format and not properly parsed as datetime objects.
 2. Replace any special characters or non-UTF-8 characters in text fields.  
 3. Check for null or empty values and handle them appropriately.  
 
+All the 27 *geolocation_state* listed in the *geolocations.csv* file and *customer_state* in *customers.csv* are 26 states and 1 federal territory of Brazil.
+Hence, the data is specific to Brazil customers.
 
 ### Problem Statement:
 
@@ -233,36 +235,36 @@ ORDER BY year_of_orders;
 Trend for 2016 does not show conclusive evidence of a growing trend.
 
 ```{sql, connection=target_db}
-SELECT DISTINCT MONTHNAME(order_purchase_timestamp) as month,
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2016") as month,
        MONTH(order_purchase_timestamp) as month_number,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count
 FROM orders
-WHERE YEAR(order_purchase_timestamp) = 2016 AND LOWER(order_status) <> 'canceled'
+WHERE YEAR(order_purchase_timestamp) = 2016
 ORDER BY MONTH(order_purchase_timestamp);
 ```
 
 Trend for 2017 shows growth in month-on-month sale throughout the year.
 
 ```{sql, connection=target_db}
-SELECT DISTINCT MONTHNAME(order_purchase_timestamp) as month,
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2017") as month,
        MONTH(order_purchase_timestamp) as month_number,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count
 FROM orders
-WHERE YEAR(order_purchase_timestamp) = 2017 AND LOWER(order_status) <> 'canceled'
+WHERE YEAR(order_purchase_timestamp) = 2017
 ORDER BY MONTH(order_purchase_timestamp);
 ```
 
 Trend for 2018 shows growth in month-on-month sale throughout the year.
 
 ```{sql, connection=target_db}
-SELECT DISTINCT MONTHNAME(order_purchase_timestamp) as month,
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2018") as month,
        MONTH(order_purchase_timestamp) as month_number,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count
 FROM orders
-WHERE YEAR(order_purchase_timestamp) = 2018 AND LOWER(order_status) <> 'canceled'
+WHERE YEAR(order_purchase_timestamp) = 2018
 ORDER BY MONTH(order_purchase_timestamp);
 ```
 
@@ -296,7 +298,7 @@ SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2016") as mont
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count
 FROM orders
-WHERE YEAR(order_purchase_timestamp) = 2016 AND LOWER(order_status) <> 'canceled'
+WHERE YEAR(order_purchase_timestamp) = 2016
 ORDER BY order_count DESC;
 ```
 
@@ -306,7 +308,7 @@ SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2017") as mont
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count
 FROM orders
-WHERE YEAR(order_purchase_timestamp) = 2017 AND LOWER(order_status) <> 'canceled'
+WHERE YEAR(order_purchase_timestamp) = 2017
 ORDER BY order_count DESC;
 ```
 
@@ -316,13 +318,77 @@ SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2018") as mont
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count
 FROM orders
-WHERE YEAR(order_purchase_timestamp) = 2018 AND LOWER(order_status) <> 'canceled'
+WHERE YEAR(order_purchase_timestamp) = 2018
 ORDER BY order_count DESC;
 ```
 
-2.3. During what time of the day, do the Brazilian customers mostly place their orders? (Dawn, Morning, Afternoon or Night)
+2.3. During what time of the day, do the Brazilian customers mostly place their orders? (Dawn, Morning, Afternoon or Night)  
+
 0-6 hrs : Dawn  
 7-12 hrs : Mornings  
 13-18 hrs : Afternoon  
 19-23 hrs : Night  
+
+As per the data, Brazilian customers prefer placing their orders during afternoon.
+
+```{sql, connection=target_db}
+SELECT DISTINCT d.time_of_day, COUNT(d.time_of_day) OVER(PARTITION BY d.time_of_day) 
+        AS count_of_orders
+FROM
+(SELECT customer_id, order_purchase_timestamp,
+       CASE
+          WHEN FLOOR(EXTRACT(HOUR FROM order_purchase_timestamp)) BETWEEN 0 AND 6 THEN
+            "Dawn"
+          WHEN FLOOR(EXTRACT(HOUR FROM order_purchase_timestamp)) BETWEEN 7 AND 12 THEN
+            "Mornings"
+          WHEN FLOOR(EXTRACT(HOUR FROM order_purchase_timestamp)) BETWEEN 13 AND 18 THEN
+            "Afternoon"
+          WHEN FLOOR(EXTRACT(HOUR FROM order_purchase_timestamp)) BETWEEN 19 AND 23 THEN
+            "Night"
+       END AS time_of_day
+FROM orders) as d
+ORDER BY count_of_orders DESC
+```
+
+**3. Evolution of E-commerce orders in the Brazil region:**  
+
+3.1. Get the month on month no. of orders placed in each state.
+
+```{sql, connection=target_db}
+SELECT c.customer_state,
+    EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
+    MONTHNAME(o.order_purchase_timestamp) AS month_name,
+    EXTRACT(MONTH FROM o.order_purchase_timestamp) AS month_number,
+    COUNT(o.order_id) AS order_count
+FROM customers as c
+JOIN orders as o
+ON c.customer_id = o.customer_id
+GROUP By c.customer_state,
+    EXTRACT(YEAR FROM o.order_purchase_timestamp),
+    MONTHNAME(o.order_purchase_timestamp),
+    EXTRACT(MONTH FROM o.order_purchase_timestamp)
+ORDER BY c.customer_state, year, month_number;
+```
+
+3.2. How are the customers distributed across all the states?  
+
+Distribution of customers across states is as follows:
+
+```{sql, connection=target_db}
+SELECT customer_state,
+       COUNT(*) AS count_of_customers
+FROM customers
+GROUP BY customer_state
+ORDER BY customer_state;
+```
+
+Distribution of customers across cities in those states is as follows:
+
+```{sql, connection=target_db}
+SELECT customer_state, customer_city,
+       COUNT(*) AS count_of_customers
+FROM customers
+GROUP BY customer_state, customer_city
+ORDER BY customer_state, customer_city;
+```
 
