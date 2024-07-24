@@ -2,7 +2,7 @@
 title: 'Business Case: Target SQL'
 subtitle: 'Scaler DS ML'
 author: 'Shayantan Dey'
-date: '24th July'
+date: '25th July'
 output:
   pdf_document: default
   html_document:
@@ -502,15 +502,136 @@ FROM orders
 ORDER BY diff_estimated_delivery DESC;
 ```
 
-345 orders had actual delivery more than 30 days later than the estimated delivery.  
+6535 orders had actual delivery later than the estimated delivery.  
 Estimation of delivery date should be revised.
 
 ```{sql, connection=target_db}
-SELECT COUNT(*) as delivery_estimate_miss_30_days
+SELECT COUNT(*) AS delivery_estimate_miss
 FROM orders
-WHERE DATEDIFF(order_delivered_customer_date, order_estimated_delivery_date) > 30;
+WHERE DATEDIFF(order_delivered_customer_date, order_estimated_delivery_date) >= 1;
 ```
 
 5.2. Find out the top 5 states with the highest & lowest average freight value.  
+
+```{sql, connection=target_db}
+SELECT DISTINCT c.customer_state,
+       AVG(oi.freight_value) OVER (PARTITION BY c.customer_state) as highest_5_avg
+FROM order_items AS oi
+JOIN orders AS o
+ON oi.order_id = o.order_id
+JOIN customers AS c
+ON o.customer_id = c.customer_id
+ORDER BY highest_5_avg DESC
+LIMIT 5;
+```
+```{sql, connection=target_db}
+SELECT DISTINCT c.customer_state,
+       AVG(oi.freight_value) OVER (PARTITION BY c.customer_state) as lowest_5_avg
+FROM order_items AS oi
+JOIN orders AS o
+ON oi.order_id = o.order_id
+JOIN customers AS c
+ON o.customer_id = c.customer_id
+ORDER BY lowest_5_avg
+LIMIT 5;
+```
+
+5.3. Find out the top 5 states with the highest & lowest average delivery time.  
+
+```{sql, connection=target_db}
+SELECT DISTINCT c.customer_state,
+       AVG(DATEDIFF(order_delivered_customer_date, order_purchase_timestamp)) 
+          OVER (PARTITION BY c.customer_state) as highest_5_avg
+FROM orders AS o
+JOIN customers AS c
+ON o.customer_id = c.customer_id
+ORDER BY highest_5_avg DESC
+LIMIT 5;
+```
+
+```{sql, connection=target_db}
+SELECT DISTINCT c.customer_state,
+       AVG(DATEDIFF(order_delivered_customer_date, order_purchase_timestamp)) 
+          OVER (PARTITION BY c.customer_state) as lowest_5_avg
+FROM orders AS o
+JOIN customers AS c
+ON o.customer_id = c.customer_id
+ORDER BY lowest_5_avg
+LIMIT 5;
+```
+
+5.4. Find out the top 5 states where the order delivery is really fast as compared to the estimated date of delivery.  
+You can use the difference between the averages of actual & estimated delivery date to figure out how fast the delivery was for each state.  
+
+```{sql, connection=target_db}
+SELECT DISTINCT c.customer_state,
+       AVG(DATEDIFF(order_estimated_delivery_date, order_delivered_customer_date)) 
+          OVER (PARTITION BY c.customer_state) as top_5_fastest_delivery
+FROM orders AS o
+JOIN customers AS c
+ON o.customer_id = c.customer_id
+ORDER BY top_5_fastest_delivery
+LIMIT 5;
+```
+
+**6. Analysis based on the payments:**  
+
+6.1. Find the month on month no. of orders placed using different payment types.  
+
+The various payment types in the dataset is as follows:
+
+```{sql, connection=target_db}
+SELECT DISTINCT payment_type, COUNT(payment_type) as count_payment_type
+FROM payments
+GROUP BY payment_type
+HAVING payment_type <> "not_defined"
+```
+
+Payment type is not defined for 3 entries in the dataset.
+
+```{sql, connection=target_db}
+SELECT payment_type, COUNT(payment_type) as count_payment_type
+FROM payments
+GROUP BY payment_type
+HAVING payment_type = "not_defined"
+```
+Month on month no. of orders placed using different payment types is as follows
+
+```{sql, connection=target_db}
+SELECT d.year, d.month, d.payment_type, COUNT(d.order_id) count_payment_type, 
+          d.month_number
+FROM
+(
+  SELECT p.payment_type, o.order_purchase_timestamp, p.order_id,
+         EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
+         MONTHNAME(o.order_purchase_timestamp) AS month,
+         EXTRACT(MONTH FROM o.order_purchase_timestamp) AS month_number
+  FROM payments AS p
+  JOIN orders AS o
+  ON p.order_id = o.order_id
+) AS d
+GROUP BY d.year, d.month, d.payment_type, d.month_number
+ORDER BY d.year, d.month_number, d.payment_type
+```
+
+6.2. Find the no. of orders placed on the basis of the payment installments that have been paid.  
+
+```{sql, connection=target_db}
+SELECT DISTINCT payment_installments,
+       COUNT(order_id) OVER (PARTITION BY payment_installments) AS count_orders
+FROM payments
+```
+
+**7. Actionable Insights & Recommendations**  
+
+7.1. The data set has data from the year 2016, 2017 and 2018.  
+7.2. For 2016, only the data for September, October and December is included in the dataset.  
+7.3. For 2017, January to December data is available.  
+7.4. For 2018, January to October data is available.  
+7.5. Two files, order_reviews.csv and geolocation.csv had unclean data.  
+7.6. The dataset represents the data for 25 states and 1 federal territory of Brazil.  
+7.7. The sales data does not show any seasonal trends but shows year on year growth.  
+7.8. 
+
 
 
