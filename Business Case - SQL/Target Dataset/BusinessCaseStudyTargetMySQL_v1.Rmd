@@ -8,12 +8,33 @@ output:
   html_document:
     df_print: paged
   html_notebook: default
+  header-includes:
+    - \usepackage{booktabs}
+    - \usepackage{longtable}
+    - \usepackage{array}
+    - \usepackage{multirow}
+    - \usepackage{wrapfig}
+    - \usepackage{float}
+    - \usepackage{colortbl}
+    - \usepackage{pdflscape}
+    - \usepackage{tabu}
+    - \usepackage{threeparttable}
+    - \usepackage{threeparttablex}
+    - \usepackage[normalem]{ulem}
+    - \usepackage{makecell}
+    - \usepackage{xcolor}
+
 ---
 
 ```{r defineconnection, include=FALSE}
 library(RMySQL)
 library(knitr)
 library(kableExtra)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+library(tidyverse)
+library(lubridate)
 
 target_db <- dbConnect(RMySQL::MySQL(),
                  dbname = "Target",
@@ -55,7 +76,7 @@ Features  <- c("customer_id","customer_unique_id","customer_zip_code_prefix","cu
 Description <- c("ID of the consumer who made the purchase","Unique ID of the consumer","Zip Code of consumer’s location","Name of the City from where order is made","State Code from where order is made (Eg. são paulo - SP)")
 d <- data.frame(Features, Description)
 knitr::kable(d) %>%
-  kable_styling(position = "left")
+  kable_styling(latex_options = c("striped"), position = "left")
 ```
 
 The **sellers.csv** contains following features:
@@ -65,7 +86,7 @@ Features  <- c("seller_id","seller_zip_code_prefix","seller_city","seller_state"
 Description <- c("Unique ID of the seller registered","Zip Code of the seller’s location","Name of the City of the seller","State Code (Eg. são paulo - SP)")
 d <- data.frame(Features, Description)
 knitr::kable(d) %>%
-  kable_styling(position = "left")
+  kable_styling(latex_options = c("striped"), position = "left")
 ```
 
 The **order_items.csv** contain following features:
@@ -75,7 +96,7 @@ Features  <- c("order_id","order_item_id","product_id","seller_id","shipping_lim
 Description <- c("A Unique ID of order made by the consumers","A Unique ID given to each item ordered in the order","A Unique ID given to each product available on the site","Unique ID of the seller registered in Target","The date before which the ordered product must be shipped","Actual price of the products ordered","Price rate at which a product is delivered from one point to another")
 d <- data.frame(Features, Description)
 knitr::kable(d) %>%
-  kable_styling(position = "left")
+  kable_styling(latex_options = c("striped"), position = "left")
 ```
 
 The **geolocations.csv** contain following features:
@@ -85,7 +106,7 @@ Features  <- c("geolocation_zip_code_prefix","geolocation_lat","geolocation_lng"
 Description <- c("First 5 digits of Zip Code","Latitude","Longitude","City","State")
 d <- data.frame(Features, Description)
 knitr::kable(d) %>%
-  kable_styling(position = "left")
+  kable_styling(latex_options = c("striped"), position = "left")
 ```
 
 The **payments.csv** contain following features:
@@ -95,7 +116,7 @@ Features  <- c("order_id","payment_sequential","payment_type","payment_installme
 Description <- c("A Unique ID of order made by the consumers","Sequences of the payments made in case of EMI","Mode of payment used (Eg. Credit Card)","Number of installments in case of EMI purchase","Total amount paid for the purchase order")
 d <- data.frame(Features, Description)
 knitr::kable(d) %>%
-  kable_styling(position = "left")
+  kable_styling(latex_options = c("striped"), position = "left")
 ```
 
 The **orders.csv** contain following features:
@@ -105,7 +126,7 @@ Features  <- c("order_id","customer_id","order_status","order_purchase_timestamp
 Description <- c("A Unique ID of order made by the consumers","ID of the consumer who made the purchase","Status of the order made i.e. delivered, shipped, etc.","Timestamp of the purchase","Delivery date at which carrier made the delivery","Date at which customer got the product","Estimated delivery date of the products")
 d <- data.frame(Features, Description)
 knitr::kable(d) %>%
-  kable_styling(position = "left")
+  kable_styling(latex_options = c("striped"), position = "left")
 ```
 
 The **reviews.csv** contain following features:
@@ -115,7 +136,7 @@ Features  <- c("review_id","order_id","review_score","review_comment_title","rev
 Description <- c("ID of the review given on the product ordered by the order id","A Unique ID of order made by the consumers","Review score given by the customer for each order on a scale of 1-5","Title of the review","Review comments posted by the consumer for each order","Timestamp of the review when it is created","Timestamp of the review answered")
 d <- data.frame(Features, Description)
 knitr::kable(d) %>%
-  kable_styling(position = "left")
+  kable_styling(latex_options = c("striped"), position = "left")
 ```
 
 The **products.csv** contain following features:
@@ -125,7 +146,7 @@ Features  <- c("product_id","product_category_name","product_name_lenght","produ
 Description <- c("A Unique identifier for the proposed project","Name of the product category","Length of the string which specifies the name given to the products ordered","Length of the description written for each product ordered on the site","Number of photos of each product ordered available on the shopping portal","Weight of the products ordered in grams","Length of the products ordered in centimeters","Height of the products ordered in centimeters","Width of the product ordered in centimeters")
 d <- data.frame(Features, Description)
 knitr::kable(d) %>%
-  kable_styling(position = "left")
+  kable_styling(latex_options = c("striped"), position = "left")
 ```
 
 ### Dataset schema:
@@ -194,7 +215,7 @@ Assuming you are a data analyst/ scientist at Target, you have been assigned the
 
 1.1. Data type of all columns in the "customers" table.
 
-```{sql, connection=target_db}
+```{sql echo=TRUE, connection=target_db}
 DESCRIBE customers;
 ```
 
@@ -238,9 +259,9 @@ Trend for 2016 does not show conclusive evidence of a growing trend.
 
 ```{sql, connection=target_db}
 SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2016") as month,
-       MONTH(order_purchase_timestamp) as month_number,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
-        AS order_count
+          AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
 FROM orders
 WHERE YEAR(order_purchase_timestamp) = 2016
 ORDER BY MONTH(order_purchase_timestamp);
@@ -250,9 +271,9 @@ Trend for 2017 shows growth in month-on-month sale throughout the year.
 
 ```{sql, connection=target_db}
 SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2017") as month,
-       MONTH(order_purchase_timestamp) as month_number,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
-        AS order_count
+        AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
 FROM orders
 WHERE YEAR(order_purchase_timestamp) = 2017
 ORDER BY MONTH(order_purchase_timestamp);
@@ -262,9 +283,9 @@ Trend for 2018 shows growth in month-on-month sale throughout the year.
 
 ```{sql, connection=target_db}
 SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2018") as month,
-       MONTH(order_purchase_timestamp) as month_number,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
-        AS order_count
+        AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
 FROM orders
 WHERE YEAR(order_purchase_timestamp) = 2018
 ORDER BY MONTH(order_purchase_timestamp);
@@ -661,7 +682,7 @@ GROUP BY d.year, d.month, d.payment_type, d.month_number
 ORDER BY d.year, d.month_number, d.payment_type
 ```
 
-```{sql echo=TRUE, connection=target_db}
+```{sql eval=FALSE, connection=target_db, include=FALSE}
 WITH d AS (
   SELECT p.payment_type, o.order_purchase_timestamp, p.order_id,
          EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
@@ -676,6 +697,29 @@ SELECT d.year, d.month, d.payment_type, COUNT(d.order_id) count_payment_type,
 FROM d
 GROUP BY d.year, d.month, d.payment_type, d.month_number
 ORDER BY d.year, d.month_number, d.payment_type
+```
+
+```{sql echo=TRUE, connection=target_db}
+WITH d AS (
+  SELECT p.payment_type, o.order_purchase_timestamp, p.order_id,
+         EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
+         MONTHNAME(o.order_purchase_timestamp) AS month,
+         EXTRACT(MONTH FROM o.order_purchase_timestamp) AS month_number
+  FROM payments AS p
+  JOIN orders AS o
+  ON p.order_id = o.order_id
+)
+SELECT 
+  d.year, 
+  d.month, 
+  COUNT(CASE WHEN d.payment_type = 'credit_card' THEN d.order_id ELSE NULL END) AS credit_card,
+  COUNT(CASE WHEN d.payment_type = 'UPI' THEN d.order_id ELSE NULL END) AS UPI,
+  COUNT(CASE WHEN d.payment_type = 'voucher' THEN d.order_id ELSE NULL END) AS voucher,
+  COUNT(CASE WHEN d.payment_type = 'debit_card' THEN d.order_id ELSE NULL END) AS debit_card,
+  d.month_number
+FROM d
+GROUP BY d.year, d.month, d.month_number
+ORDER BY d.year, d.month_number;
 ```
 
 6.2. Find the no. of orders placed on the basis of the payment installments that have been paid.  
@@ -695,7 +739,145 @@ FROM payments
 7.5. Two files, order_reviews.csv and geolocation.csv had unclean data.  
 7.6. The dataset represents the data for 25 states and 1 federal territory of Brazil.  
 7.7. The sales data does not show any seasonal trends but shows year on year growth.  
-7.8. 
+7.8. Plotting the sales data:
 
+```{r echo = FALSE, results = TRUE}
+query <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2016
+ORDER BY MONTH(order_purchase_timestamp);"
+sales_data <- dbGetQuery(target_db, query)
+all_months <- data.frame(month = factor(month.abb, levels = month.abb))
 
+sales_data <- all_months %>%
+  left_join(sales_data, by = "month") %>%
+  mutate(order_count = ifelse(is.na(order_count), 0, order_count))
 
+sales_data$month <- factor(sales_data$month, levels = unique(sales_data$month))
+
+ggplot(sales_data, aes(x = month, y = order_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Orders in 2016", x = "2016", y = "Order Count")
+```
+
+```{r echo = FALSE, results = TRUE}
+query <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2017
+ORDER BY MONTH(order_purchase_timestamp);"
+sales_data <- dbGetQuery(target_db, query)
+all_months <- data.frame(month = factor(month.abb, levels = month.abb))
+
+sales_data <- all_months %>%
+  left_join(sales_data, by = "month") %>%
+  mutate(order_count = ifelse(is.na(order_count), 0, order_count))
+
+sales_data$month <- factor(sales_data$month, levels = unique(sales_data$month))
+
+ggplot(sales_data, aes(x = month, y = order_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Orders in 2017", x = "2017", y = "Order Count")
+```
+
+```{r echo = FALSE, results = TRUE}
+query <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2018
+ORDER BY MONTH(order_purchase_timestamp);"
+sales_data <- dbGetQuery(target_db, query)
+all_months <- data.frame(month = factor(month.abb, levels = month.abb))
+
+sales_data <- all_months %>%
+  left_join(sales_data, by = "month") %>%
+  mutate(order_count = ifelse(is.na(order_count), 0, order_count))
+
+sales_data$month <- factor(sales_data$month, levels = unique(sales_data$month))
+
+ggplot(sales_data, aes(x = month, y = order_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Orders in 2018", x = "2018", y = "Order Count")
+```
+```{r echo = FALSE, results = TRUE}
+query2016 <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2016
+ORDER BY MONTH(order_purchase_timestamp);"
+
+query2017 <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2017
+ORDER BY MONTH(order_purchase_timestamp);"
+
+query2018 <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
+FROM orders
+WHERE YEAR(order_purchase_timestamp) = 2018
+ORDER BY MONTH(order_purchase_timestamp);"
+
+sales_data2016 <- dbGetQuery(target_db, query2016)
+sales_data2017 <- dbGetQuery(target_db, query2017)
+sales_data2018 <- dbGetQuery(target_db, query2018)
+
+all_months <- data.frame(month = factor(month.abb, levels = month.abb))
+
+sales_data2016 <- all_months %>%
+  left_join(sales_data2016, by = "month") %>%
+  mutate(order_count = ifelse(is.na(order_count), 0, order_count))
+
+sales_data2017 <- all_months %>%
+  left_join(sales_data2017, by = "month") %>%
+  mutate(order_count = ifelse(is.na(order_count), 0, order_count))
+
+sales_data2018 <- all_months %>%
+  left_join(sales_data2018, by = "month") %>%
+  mutate(order_count = ifelse(is.na(order_count), 0, order_count))
+
+sales_data2016$month <- factor(sales_data2016$month, levels = unique(sales_data$month))
+sales_data2017$month <- factor(sales_data2017$month, levels = unique(sales_data$month))
+sales_data2018$month <- factor(sales_data2018$month, levels = unique(sales_data$month))
+
+par(mfrow = c(3, 1))
+
+plot1 <- ggplot(sales_data2016, aes(x = month, y = order_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Orders in 2016", x = "2016", y = "Order Count") +
+  ylim(0, 8000)
+print(plot1)
+
+plot2 <- ggplot(sales_data2017, aes(x = month, y = order_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Orders in 2017", x = "2017", y = "Order Count") +
+  ylim(0, 8000)
+print(plot2)
+
+plot3 <- ggplot(sales_data2018, aes(x = month, y = order_count)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Orders in 2018", x = "2018", y = "Order Count") +
+  ylim(0, 8000)
+print(plot3)
+
+plot <- plot1 / plot2 / plot3
+print(plot)
+
+```
+
+```{r closeconnection, include=FALSE}
+dbDisconnect(target_db)
+```
