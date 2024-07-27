@@ -1016,6 +1016,7 @@ WITH d AS (
 )
 SELECT *
 FROM d
+ORDER BY orders_per_state DESC
 ```
 
 ```{r closeconnection, include=FALSE}
