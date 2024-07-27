@@ -333,7 +333,7 @@ ORDER BY order_count DESC;
 
 As per the data, Brazilian customers prefer placing their orders during afternoon.
 
-```{sql, connection=target_db}
+```{sql eval=FALSE, connection=target_db, include=FALSE}
 SELECT DISTINCT d.time_of_day, COUNT(d.time_of_day) OVER(PARTITION BY d.time_of_day) 
         AS count_of_orders
 FROM
@@ -349,6 +349,25 @@ FROM
             "Night"
        END AS time_of_day
 FROM orders) as d
+ORDER BY count_of_orders DESC;
+```
+
+```{sql, connection=target_db}
+WITH d AS (SELECT customer_id, order_purchase_timestamp,
+       CASE
+          WHEN FLOOR(EXTRACT(HOUR FROM order_purchase_timestamp)) BETWEEN 0 AND 6 THEN
+            "Dawn"
+          WHEN FLOOR(EXTRACT(HOUR FROM order_purchase_timestamp)) BETWEEN 7 AND 12 THEN
+            "Mornings"
+          WHEN FLOOR(EXTRACT(HOUR FROM order_purchase_timestamp)) BETWEEN 13 AND 18 THEN
+            "Afternoon"
+          WHEN FLOOR(EXTRACT(HOUR FROM order_purchase_timestamp)) BETWEEN 19 AND 23 THEN
+            "Night"
+       END AS time_of_day
+FROM orders)
+SELECT DISTINCT d.time_of_day, COUNT(d.time_of_day) OVER(PARTITION BY d.time_of_day) 
+        AS count_of_orders
+FROM d
 ORDER BY count_of_orders DESC;
 ```
 
@@ -399,7 +418,7 @@ ORDER BY customer_state, customer_city;
 4.1. Get the % increase in the cost of orders from year 2017 to 2018 (include months between Jan to Aug only).
 You can use the "payment_value" column in the payments table to get the cost of orders.  
 
-```{sql, connection=target_db}
+```{sql eval=FALSE, connection=target_db, include=FALSE}
 SELECT d3.yearly_payment_value as 2017_payment_value,
        d3.lead_ as 2018_payment_value,
        ROUND((d3.diff/d3.yearly_payment_value) * 100, 2) 
@@ -426,6 +445,34 @@ WHERE (o.order_purchase_timestamp BETWEEN '2017-01-01' AND '2017-08-31')
 ) AS d
 ) AS d2
 ) AS d3
+WHERE d3.lead_ IS NOT NULL;
+```
+
+```{sql, connection=target_db}
+WITH d AS (SELECT EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
+       p.payment_value
+       FROM orders as o
+       JOIN payments as p
+       ON o.order_id = p.order_id
+       WHERE (o.order_purchase_timestamp BETWEEN '2017-01-01' AND '2017-08-31')
+         OR (o.order_purchase_timestamp BETWEEN '2018-01-01' AND '2018-08-31')),
+      
+    d2 AS (SELECT DISTINCT d.year,
+       SUM(d.payment_value) OVER (PARTITION BY d.year) as yearly_payment_value
+       FROM d),
+
+    d3 AS (SELECT d2.year, d2.yearly_payment_value,
+           LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) 
+              AS lead_,
+           ((LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) 
+             - d2.yearly_payment_value)) as diff
+           FROM d2)
+           
+SELECT d3.yearly_payment_value as 2017_payment_value,
+       d3.lead_ as 2018_payment_value,
+       ROUND((d3.diff/d3.yearly_payment_value) * 100, 2) 
+          as 2017_to_2018_percentage_increase
+FROM d3
 WHERE d3.lead_ IS NOT NULL;
 ```
 
@@ -597,7 +644,7 @@ HAVING payment_type = "not_defined"
 ```
 Month on month no. of orders placed using different payment types is as follows
 
-```{sql, connection=target_db}
+```{sql eval=FALSE, connection=target_db, include=FALSE}
 SELECT d.year, d.month, d.payment_type, COUNT(d.order_id) count_payment_type, 
           d.month_number
 FROM
@@ -610,6 +657,23 @@ FROM
   JOIN orders AS o
   ON p.order_id = o.order_id
 ) AS d
+GROUP BY d.year, d.month, d.payment_type, d.month_number
+ORDER BY d.year, d.month_number, d.payment_type
+```
+
+```{sql echo=TRUE, connection=target_db}
+WITH d AS (
+  SELECT p.payment_type, o.order_purchase_timestamp, p.order_id,
+         EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
+         MONTHNAME(o.order_purchase_timestamp) AS month,
+         EXTRACT(MONTH FROM o.order_purchase_timestamp) AS month_number
+  FROM payments AS p
+  JOIN orders AS o
+  ON p.order_id = o.order_id
+  )
+SELECT d.year, d.month, d.payment_type, COUNT(d.order_id) count_payment_type, 
+          d.month_number
+FROM d
 GROUP BY d.year, d.month, d.payment_type, d.month_number
 ORDER BY d.year, d.month_number, d.payment_type
 ```
