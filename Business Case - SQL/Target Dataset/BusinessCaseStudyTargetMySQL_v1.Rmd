@@ -885,8 +885,7 @@ plot <- plot1 / plot2 / plot3
 print(plot)
 ```
 
-7.8. The sales trend in the dataset shows gaps in the plot. This suggests that data  
-     is not available for all days.
+7.8. The sales trend plot in the dataset:
 
 ```{r echo = FALSE, results = TRUE}
 queryAll <- "SELECT DISTINCT DATE(order_purchase_timestamp) as day,
@@ -895,24 +894,132 @@ FROM orders
 ORDER BY DATE(order_purchase_timestamp);"
 
 sales_dataAll <- dbGetQuery(target_db, queryAll)
+sales_dataAll$day <- as.Date(sales_dataAll$day, format = "%Y-%m-%d")
+
+summary(sales_dataAll)
+
+full_dates <- seq.Date(from = as.Date("2016-09-01"), to = as.Date("2019-01-01"), by = "day")
+
+sales_dataAll <- sales_dataAll %>%
+  complete(day = full_dates, fill = list(order_count = 0))
+
+sales_dataAll <- sales_dataAll %>%
+  filter(order_count != 0)
 
 ggplot(sales_dataAll, aes(x = day, y = order_count)) +
-  # geom_bar(stat = "identity", fill = "black") +
-  geom_point(color = "blue") +
-  labs(title = "Orders in the dataset", x = "Sep 2016 - Oct 2018", y = "Order Count") +
-  theme_minimal()
+  geom_point(aes(color = ifelse(order_count <= 100, "1-100", 
+                                ifelse(order_count <= 500, "101-500", "501+")))) +
+  scale_color_manual(values = c("1-100" = "red", "101-500" = "blue", "501+" = "black")) +
+  theme(legend.position = "none") +
+  labs(title = "Number of orders per day", x = "Sep 2016 - Dec 2018", y = "Order Count") +
+  geom_vline(xintercept = as.Date("2016-10-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2017-01-01"), linetype = "dashed", color = "black") +
+  geom_vline(xintercept = as.Date("2017-04-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2017-07-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2017-10-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2018-01-01"), linetype = "dashed", color = "black") +
+  geom_vline(xintercept = as.Date("2018-04-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2018-07-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2018-10-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2019-01-01"), linetype = "dashed", color = "black") +
+  scale_x_date(limits = c(as.Date("2016-09-01"), as.Date("2019-01-01")), 
+               date_breaks = "1 year", date_labels = "%Y") +
+  geom_hline(yintercept = 0, color = "black", linetype = "solid")
+```
 
+The plot reveals the following aspects of the data.  
+a. The plot shows gaps in between dates when orders were placed.  
+   Further analysis shows the gaps between dates in the dataset as follows:
+
+```{sql echo=TRUE, connection=target_db}
+WITH d AS (
+    SELECT DATE(order_purchase_timestamp) AS day,
+           LAG(DATE(order_purchase_timestamp)) OVER 
+              (ORDER BY DATE(order_purchase_timestamp)) AS previous_date
+    FROM orders
+)
+SELECT previous_date AS date, day AS next_date,
+       datediff(day, previous_date) AS gap_between_dates
+FROM d
+WHERE DATEDIFF(day, previous_date) > 1
+ORDER BY DATEDIFF(day, previous_date) DESC
+```
+
+b. The trend shoots up during the 4th quarter of 2017 and the order placed per  
+   day sees a steep rise.  
+c. One data point shows extreme deviation of 1176 orders on a single day on 24th  
+   November 2017. This count deviated greatly from the Median of 148 orders and  
+   Mean of 156 orders.
+
+```{sql echo=TRUE, connection=target_db}
+WITH d AS (
+    SELECT DISTINCT DATE(order_purchase_timestamp) AS date,
+           COUNT(order_id) OVER (PARTITION BY DATE(order_purchase_timestamp))
+              AS count_orders
+    FROM orders
+)
+SELECT date, count_orders
+FROM d
+ORDER BY count_orders DESC
+```
+
+
+Hence we can conclude that the data reported through orders.csv is not conducive  
+for creating a predictive model.  
+
+7.8. Reviewing the location wise distribution of data:  
+
+```{r echo = FALSE, results = TRUE}
+queryAll <- "SELECT DISTINCT DATE(order_purchase_timestamp) as day,
+COUNT(order_id) OVER (PARTITION BY DATE(order_purchase_timestamp)) AS order_count
+FROM orders
+ORDER BY DATE(order_purchase_timestamp);"
+
+sales_dataAll <- dbGetQuery(target_db, queryAll)
+sales_dataAll$day <- as.Date(sales_dataAll$day, format = "%Y-%m-%d")
+
+summary(sales_dataAll)
+
+full_dates <- seq.Date(from = as.Date("2016-09-01"), to = as.Date("2019-01-01"), by = "day")
+
+sales_dataAll <- sales_dataAll %>%
+  complete(day = full_dates, fill = list(order_count = 0))
+
+sales_dataAll <- sales_dataAll %>%
+  filter(order_count != 0)
+
+ggplot(sales_dataAll, aes(x = day, y = order_count)) +
+  geom_point(aes(color = ifelse(order_count <= 100, "1-100", 
+                                ifelse(order_count <= 500, "101-500", "501+")))) +
+  scale_color_manual(values = c("1-100" = "red", "101-500" = "blue", "501+" = "black")) +
+  theme(legend.position = "none") +
+  labs(title = "Number of orders per day", x = "Sep 2016 - Dec 2018", y = "Order Count") +
+  geom_vline(xintercept = as.Date("2016-10-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2017-01-01"), linetype = "dashed", color = "black") +
+  geom_vline(xintercept = as.Date("2017-04-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2017-07-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2017-10-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2018-01-01"), linetype = "dashed", color = "black") +
+  geom_vline(xintercept = as.Date("2018-04-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2018-07-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2018-10-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2019-01-01"), linetype = "dashed", color = "black") +
+  scale_x_date(limits = c(as.Date("2016-09-01"), as.Date("2019-01-01")), 
+               date_breaks = "1 year", date_labels = "%Y") +
+  geom_hline(yintercept = 0, color = "black", linetype = "solid")
 ```
 
 ```{sql echo=TRUE, connection=target_db}
-WITH d AS (SELECT DISTINCT DATE(order_purchase_timestamp) as day,
-COUNT(order_id) OVER (PARTITION BY DATE(order_purchase_timestamp)) AS order_count
-FROM orders
-ORDER BY DATE(order_purchase_timestamp))
-SELECT max(day), min(day) FROM d
-
+WITH d AS (
+    SELECT DISTINCT DATE(order_purchase_timestamp) AS date,
+           COUNT(order_id) OVER (PARTITION BY DATE(order_purchase_timestamp))
+              AS count_orders
+    FROM orders
+)
+SELECT date, count_orders
+FROM d
+ORDER BY count_orders DESC
 ```
-
 
 ```{r closeconnection, include=FALSE}
 dbDisconnect(target_db)
