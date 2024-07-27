@@ -739,9 +739,9 @@ FROM payments
 7.5. Two files, order_reviews.csv and geolocation.csv had unclean data.  
 7.6. The dataset represents the data for 25 states and 1 federal territory of Brazil.  
 7.7. The sales data does not show any seasonal trends but shows year on year growth.  
-7.8. Plotting the sales data:
+     Plotting the sales data:
 
-```{r echo = FALSE, results = TRUE}
+```{r echo = FALSE, results = FALSE}
 query <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count,
@@ -758,12 +758,12 @@ sales_data <- all_months %>%
 
 sales_data$month <- factor(sales_data$month, levels = unique(sales_data$month))
 
-ggplot(sales_data, aes(x = month, y = order_count)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  labs(title = "Orders in 2016", x = "2016", y = "Order Count")
+# ggplot(sales_data, aes(x = month, y = order_count)) +
+#  geom_bar(stat = "identity", fill = "steelblue") +
+#  labs(title = "Orders in 2016", x = "2016", y = "Order Count")
 ```
 
-```{r echo = FALSE, results = TRUE}
+```{r echo = FALSE, results = FALSE}
 query <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count,
@@ -780,12 +780,12 @@ sales_data <- all_months %>%
 
 sales_data$month <- factor(sales_data$month, levels = unique(sales_data$month))
 
-ggplot(sales_data, aes(x = month, y = order_count)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  labs(title = "Orders in 2017", x = "2017", y = "Order Count")
+# ggplot(sales_data, aes(x = month, y = order_count)) +
+#  geom_bar(stat = "identity", fill = "steelblue") +
+#  labs(title = "Orders in 2017", x = "2017", y = "Order Count")
 ```
 
-```{r echo = FALSE, results = TRUE}
+```{r echo = FALSE, results = FALSE}
 query <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count,
@@ -802,10 +802,11 @@ sales_data <- all_months %>%
 
 sales_data$month <- factor(sales_data$month, levels = unique(sales_data$month))
 
-ggplot(sales_data, aes(x = month, y = order_count)) +
-  geom_bar(stat = "identity", fill = "steelblue") +
-  labs(title = "Orders in 2018", x = "2018", y = "Order Count")
+# ggplot(sales_data, aes(x = month, y = order_count)) +
+#  geom_bar(stat = "identity", fill = "steelblue") +
+#  labs(title = "Orders in 2018", x = "2018", y = "Order Count")
 ```
+
 ```{r echo = FALSE, results = TRUE}
 query2016 <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
@@ -829,6 +830,13 @@ query2018 <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as mo
        MONTH(order_purchase_timestamp) as month_number
 FROM orders
 WHERE YEAR(order_purchase_timestamp) = 2018
+ORDER BY MONTH(order_purchase_timestamp);"
+
+queryAll <- "SELECT DISTINCT LEFT(MONTHNAME(order_purchase_timestamp), 3) as month,
+       COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
+        AS order_count,
+       MONTH(order_purchase_timestamp) as month_number
+FROM orders
 ORDER BY MONTH(order_purchase_timestamp);"
 
 sales_data2016 <- dbGetQuery(target_db, query2016)
@@ -859,24 +867,52 @@ plot1 <- ggplot(sales_data2016, aes(x = month, y = order_count)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(title = "Orders in 2016", x = "2016", y = "Order Count") +
   ylim(0, 8000)
-print(plot1)
+# print(plot1)
 
 plot2 <- ggplot(sales_data2017, aes(x = month, y = order_count)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(title = "Orders in 2017", x = "2017", y = "Order Count") +
   ylim(0, 8000)
-print(plot2)
+# print(plot2)
 
 plot3 <- ggplot(sales_data2018, aes(x = month, y = order_count)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(title = "Orders in 2018", x = "2018", y = "Order Count") +
   ylim(0, 8000)
-print(plot3)
+# print(plot3)
 
 plot <- plot1 / plot2 / plot3
 print(plot)
+```
+
+7.8. The sales trend in the dataset shows gaps in the plot. This suggests that data  
+     is not available for all days.
+
+```{r echo = FALSE, results = TRUE}
+queryAll <- "SELECT DISTINCT DATE(order_purchase_timestamp) as day,
+COUNT(order_id) OVER (PARTITION BY DATE(order_purchase_timestamp)) AS order_count
+FROM orders
+ORDER BY DATE(order_purchase_timestamp);"
+
+sales_dataAll <- dbGetQuery(target_db, queryAll)
+
+ggplot(sales_dataAll, aes(x = day, y = order_count)) +
+  # geom_bar(stat = "identity", fill = "black") +
+  geom_point(color = "blue") +
+  labs(title = "Orders in the dataset", x = "Sep 2016 - Oct 2018", y = "Order Count") +
+  theme_minimal()
 
 ```
+
+```{sql echo=TRUE, connection=target_db}
+WITH d AS (SELECT DISTINCT DATE(order_purchase_timestamp) as day,
+COUNT(order_id) OVER (PARTITION BY DATE(order_purchase_timestamp)) AS order_count
+FROM orders
+ORDER BY DATE(order_purchase_timestamp))
+SELECT max(day), min(day) FROM d
+
+```
+
 
 ```{r closeconnection, include=FALSE}
 dbDisconnect(target_db)
