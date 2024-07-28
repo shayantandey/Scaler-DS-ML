@@ -1089,7 +1089,7 @@ WITH d AS (
        AVG(d2.avg_delivered_customer) OVER () AS avg_delivery_Country
   FROM d2
   )
-SELECT customer_state, total_orders, avg_delivered_customer,
+SELECT customer_state, total_orders, avg_delivered_customer AS avg_delivery_State,
        ROUND(avg_delivery_Country, 2) AS avg_delivery_Country
 FROM d3
 WHERE ((avg_delivery_Country) - (avg_delivered_customer)) < 0
@@ -1101,7 +1101,7 @@ e. The following bubble chart shows total orders vs average delivery time.
    This chart will assist in identifying the states that requires attention to  
    improve customer experience by improving delivery time.
 
-```{r echo = FALSE, results = TRUE}
+```{r echo = FALSE, results = TRUE, warning=FALSE}
 queryAll <- "WITH d AS (
     SELECT c.customer_state,
            COUNT(o.order_id) OVER (PARTITION BY c.customer_state)
