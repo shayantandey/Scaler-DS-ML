@@ -33,12 +33,11 @@ library(kableExtra)
 library(ggplot2)
 library(dplyr)
 library(patchwork)
-library(tidyverse)
-library(lubridate)
+library(tidyr)
 
 target_db <- dbConnect(RMySQL::MySQL(),
                  dbname = "Target",
-                 host = "172.18.0.2",
+                 host = "172.18.0.3",
                  port = 3306,  # Default MySQL port
                  user = "root",
                  password = "password")
@@ -1018,6 +1017,134 @@ SELECT *
 FROM d
 ORDER BY orders_per_state DESC
 ```
+
+7.9. Exploratory analysis reveals the following information regarding product deliveries.  
+
+a. There is a high deviation in estimated delivery dates and actual delivery to the customer.  
+   The estimated delivery dates require further analysis for more realistic estimates.  
+b. There is a high deviation in delivery as per carrier and actual delivery to the customer.  
+   Further investigation is required to drill into the issue.  
+c. There is a high deviation in delivery as per carrier and estimated delivery to the customer.  
+   Further investigation is required to drill into the issue.  
+
+```{sql echo=TRUE, connection=target_db}
+WITH d AS (
+    SELECT c.customer_state,
+           COUNT(o.order_id) OVER (PARTITION BY c.customer_state)
+              AS total_orders,
+           (DATEDIFF(DATE(o.order_estimated_delivery_date), 
+              DATE(o.order_purchase_timestamp))) AS purchase_estimated_delivery,
+           (DATEDIFF(DATE(o.order_delivered_carrier_date), 
+              DATE(o.order_purchase_timestamp))) AS purchase_delivered_carrier,
+           (DATEDIFF(DATE(o.order_delivered_customer_date), 
+              DATE(o.order_purchase_timestamp))) AS purchase_delivered_customer
+           
+    FROM customers AS c
+    JOIN orders AS o
+    ON c.customer_id = o.customer_id
+)
+SELECT DISTINCT d.customer_state, d.total_orders,
+       ROUND(AVG(d.purchase_estimated_delivery) OVER (PARTITION BY d.customer_state), 2)
+          AS avg_estimated_delivery,
+       ROUND(AVG(d.purchase_delivered_carrier) OVER (PARTITION BY d.customer_state), 2)
+          AS avg_delivered_carrier,
+       ROUND(AVG(d.purchase_delivered_customer) OVER (PARTITION BY d.customer_state), 2)
+          AS avg_delivered_customer
+       
+FROM d
+ORDER BY d.total_orders DESC
+```
+
+d. The following states require attention as they deviate from the average delivery time.  
+   Further investigation is required to drill into the issue.
+
+```{sql echo=TRUE, connection=target_db}
+WITH d AS (
+    SELECT c.customer_state,
+           COUNT(o.order_id) OVER (PARTITION BY c.customer_state)
+              AS total_orders,
+           (DATEDIFF(DATE(o.order_estimated_delivery_date), 
+              DATE(o.order_purchase_timestamp))) AS purchase_estimated_delivery,
+           (DATEDIFF(DATE(o.order_delivered_carrier_date), 
+              DATE(o.order_purchase_timestamp))) AS purchase_delivered_carrier,
+           (DATEDIFF(DATE(o.order_delivered_customer_date), 
+              DATE(o.order_purchase_timestamp))) AS purchase_delivered_customer
+           
+    FROM customers AS c
+    JOIN orders AS o
+    ON c.customer_id = o.customer_id
+    ),
+  d2 AS (
+  SELECT DISTINCT d.customer_state, d.total_orders,
+       ROUND(AVG(d.purchase_estimated_delivery) OVER (PARTITION BY d.customer_state), 2)
+          AS avg_estimated_delivery,
+       ROUND(AVG(d.purchase_delivered_carrier) OVER (PARTITION BY d.customer_state), 2)
+          AS avg_delivered_carrier,
+       ROUND(AVG(d.purchase_delivered_customer) OVER (PARTITION BY d.customer_state), 2)
+          AS avg_delivered_customer
+  FROM d
+  ),
+  d3 AS (
+  SELECT customer_state, total_orders, avg_delivered_customer,
+       AVG(d2.avg_delivered_customer) OVER () AS avg_delivery_Country
+  FROM d2
+  )
+SELECT customer_state, total_orders, avg_delivered_customer,
+       ROUND(avg_delivery_Country, 2) AS avg_delivery_Country
+FROM d3
+WHERE ((avg_delivery_Country) - (avg_delivered_customer)) < 0
+ORDER BY total_orders DESC
+```
+e. The following bubble chart shows total orders vs average delivery time.  
+   The size of the circle depicts order count. Colour gradient towards Blue indicates  
+   better delivery time. Colour gradient towards Red indicates worse delivery time.  
+   This chart will assist in identifying the states that requires attention to  
+   improve customer experience by improving delivery time.
+
+```{r echo = FALSE, results = TRUE}
+queryAll <- "WITH d AS (
+    SELECT c.customer_state,
+           COUNT(o.order_id) OVER (PARTITION BY c.customer_state)
+              AS total_orders,
+           (DATEDIFF(DATE(o.order_estimated_delivery_date), 
+              DATE(o.order_purchase_timestamp))) AS purchase_estimated_delivery,
+           (DATEDIFF(DATE(o.order_delivered_carrier_date), 
+              DATE(o.order_purchase_timestamp))) AS purchase_delivered_carrier,
+           (DATEDIFF(DATE(o.order_delivered_customer_date), 
+              DATE(o.order_purchase_timestamp))) AS purchase_delivered_customer
+           
+    FROM customers AS c
+    JOIN orders AS o
+    ON c.customer_id = o.customer_id
+)
+SELECT DISTINCT d.customer_state, d.total_orders,
+       ROUND(AVG(d.purchase_estimated_delivery) OVER (PARTITION BY d.customer_state), 2)
+          AS avg_estimated_delivery,
+       ROUND(AVG(d.purchase_delivered_carrier) OVER (PARTITION BY d.customer_state), 2)
+          AS avg_delivered_carrier,
+       ROUND(AVG(d.purchase_delivered_customer) OVER (PARTITION BY d.customer_state), 2)
+          AS avg_delivered_customer
+       
+FROM d
+ORDER BY d.total_orders DESC;"
+
+state_dataAll <- dbGetQuery(target_db, queryAll)
+
+summary(state_dataAll)
+
+ggplot(state_dataAll, aes(x = customer_state, y = total_orders, size = total_orders, color = avg_delivered_customer)) +
+  geom_point(alpha = 0.7) +
+  # scale_size(range = c(5, 20), name = "Total Orders") +
+  scale_size(range = c(5, 20), guide = "none") + 
+  scale_color_gradient(low = "blue", high = "red", name = "Avg Delivery Time (days)") +
+  scale_y_continuous(limits = c(0, 50000), breaks = seq(0, 50000, by = 5000)) +
+  labs(title = "Total Orders and Average Delivery Time by State",
+       x = "State",
+       y = "Total Orders") +
+  # theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
 
 ```{r closeconnection, include=FALSE}
 dbDisconnect(target_db)
