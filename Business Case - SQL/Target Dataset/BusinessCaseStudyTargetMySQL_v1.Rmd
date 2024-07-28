@@ -2,7 +2,7 @@
 title: 'Business Case: Target SQL'
 subtitle: 'Scaler DS ML'
 author: 'Shayantan Dey'
-date: '25th July'
+date: '28th July'
 output:
   pdf_document: default
   html_document:
@@ -711,10 +711,14 @@ WITH d AS (
 SELECT 
   d.year, 
   d.month, 
-  COUNT(CASE WHEN d.payment_type = 'credit_card' THEN d.order_id ELSE NULL END) AS credit_card,
-  COUNT(CASE WHEN d.payment_type = 'UPI' THEN d.order_id ELSE NULL END) AS UPI,
-  COUNT(CASE WHEN d.payment_type = 'voucher' THEN d.order_id ELSE NULL END) AS voucher,
-  COUNT(CASE WHEN d.payment_type = 'debit_card' THEN d.order_id ELSE NULL END) AS debit_card,
+  COUNT(CASE WHEN d.payment_type = 'credit_card' THEN d.order_id ELSE NULL END) 
+        AS credit_card,
+  COUNT(CASE WHEN d.payment_type = 'UPI' THEN d.order_id ELSE NULL END) 
+        AS UPI,
+  COUNT(CASE WHEN d.payment_type = 'voucher' THEN d.order_id ELSE NULL END) 
+        AS voucher,
+  COUNT(CASE WHEN d.payment_type = 'debit_card' THEN d.order_id ELSE NULL END) 
+        AS debit_card,
   d.month_number
 FROM d
 GROUP BY d.year, d.month, d.month_number
@@ -1287,6 +1291,79 @@ ggplot(sales_dataAll, aes(x = day, y = order_count)) +
   theme(legend.position = "none") +
   # labs(title = "Number of orders per day", x = "Sep 2016 - Dec 2018", y = "Order Count") +
   labs(title = "Number of orders per day - bed table bath", x = "Sep 2016 - Dec 2018", y = "Order Count") +
+  geom_vline(xintercept = as.Date("2016-10-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2017-01-01"), linetype = "dashed", color = "black") +
+  geom_vline(xintercept = as.Date("2017-04-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2017-07-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2017-10-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2018-01-01"), linetype = "dashed", color = "black") +
+  geom_vline(xintercept = as.Date("2018-04-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2018-07-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2018-10-01"), linetype = "dashed", color = "grey") +
+  geom_vline(xintercept = as.Date("2019-01-01"), linetype = "dashed", color = "black") +
+  scale_x_date(limits = c(as.Date("2016-09-01"), as.Date("2019-01-01")), 
+               date_breaks = "1 year", date_labels = "%Y") +
+  geom_hline(yintercept = 0, color = "black", linetype = "solid")
+```
+
+d. Sales trend in the data set for top 5 selling product category:  
+
+```{r echo = FALSE, results = TRUE}
+queryAll <- "WITH d AS (
+    SELECT DISTINCT p.`product category` AS product_category,
+           COUNT(oi.order_item_id) OVER (PARTITION BY `product category`) 
+              AS count_product_category
+    FROM customers AS c
+      JOIN orders AS o
+        ON c.customer_id = o.customer_id
+    JOIN order_items AS oi
+        ON o.order_id = oi.order_id
+    JOIN products AS p
+        ON oi.product_id = p.product_id
+  ),
+  d2 AS (
+    SELECT d.product_category, d.count_product_category,
+           DENSE_RANK() OVER (ORDER BY d.count_product_category DESC) 
+                AS rank_category
+    FROM d
+  ),
+  top_prod_cat AS (
+    SELECT d2.product_category
+    FROM d2
+    WHERE d2.rank_category <= 5
+ )
+SELECT DISTINCT DATE(o.order_purchase_timestamp) as day,
+       COUNT(o.order_id) OVER (PARTITION BY DATE(o.order_purchase_timestamp)) 
+            AS order_count
+FROM customers AS c
+  JOIN orders AS o
+        ON c.customer_id = o.customer_id
+  JOIN order_items AS oi
+        ON o.order_id = oi.order_id
+  JOIN products AS p
+        ON oi.product_id = p.product_id
+WHERE p.`product category` IN (SELECT product_category FROM top_prod_cat);"
+
+sales_dataAll <- dbGetQuery(target_db, queryAll)
+sales_dataAll$day <- as.Date(sales_dataAll$day, format = "%Y-%m-%d")
+
+summary(sales_dataAll)
+
+full_dates <- seq.Date(from = as.Date("2016-09-01"), to = as.Date("2019-01-01"), by = "day")
+
+sales_dataAll <- sales_dataAll %>%
+  complete(day = full_dates, fill = list(order_count = 0))
+
+sales_dataAll <- sales_dataAll %>%
+  filter(order_count != 0)
+
+ggplot(sales_dataAll, aes(x = day, y = order_count)) +
+  geom_point(aes(color = ifelse(order_count <= 100, "1-100", 
+                                ifelse(order_count <= 500, "101-500", "501+")))) +
+  scale_color_manual(values = c("1-100" = "red", "101-500" = "blue", "501+" = "black")) +
+  theme(legend.position = "none") +
+  # labs(title = "Number of orders per day", x = "Sep 2016 - Dec 2018", y = "Order Count") +
+  labs(title = "Number of orders per day - Top 5 product categories", x = "Sep 2016 - Dec 2018", y = "Order Count") +
   geom_vline(xintercept = as.Date("2016-10-01"), linetype = "dashed", color = "grey") +
   geom_vline(xintercept = as.Date("2017-01-01"), linetype = "dashed", color = "black") +
   geom_vline(xintercept = as.Date("2017-04-01"), linetype = "dashed", color = "grey") +
