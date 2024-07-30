@@ -1104,11 +1104,9 @@ FROM d3
 WHERE ((avg_delivery_Country) - (avg_delivered_customer)) < 0
 ORDER BY total_orders DESC
 ```
-e. The following bubble chart shows total orders vs average delivery time.  
-   The size of the circle depicts order count. Colour gradient towards Blue indicates  
-   better delivery time. Colour gradient towards Red indicates worse delivery time.  
-   This chart will assist in identifying the states that requires attention to  
-   improve customer experience by improving delivery time.
+
+e. The following bubble chart shows total orders vs average delivery time. The size of the circle depicts order count. Colour gradient towards Blue indicates better delivery time. Colour gradient towards Red indicates worse delivery time. This chart will assist in identifying the states that requires attention to improve customer experience by improving delivery time.  
+For example, Sau Paulo has the largest volume of order and the best average delivery time.
 
 ```{r echo = FALSE, results = TRUE, warning=FALSE}
 queryAll <- "WITH d AS (
