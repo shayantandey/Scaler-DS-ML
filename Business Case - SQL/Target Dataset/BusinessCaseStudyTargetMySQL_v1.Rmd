@@ -2,7 +2,7 @@
 title: 'Business Case: Target SQL'
 subtitle: 'Scaler DS ML'
 author: 'Shayantan Dey'
-date: '28th July'
+date: '30th July'
 output:
   pdf_document: default
   html_document:
@@ -43,7 +43,6 @@ target_db <- dbConnect(RMySQL::MySQL(),
                  password = "password")
 ```
 
-[GitHub Repository for the case study](https://github.com/shayantandey/Scaler-DS-ML/tree/main/Business%20Case%20-%20SQL/Target%20Dataset)
 
 ### Context:
 
@@ -438,36 +437,6 @@ ORDER BY customer_state, customer_city;
 4.1. Get the % increase in the cost of orders from year 2017 to 2018 (include months between Jan to Aug only).
 You can use the "payment_value" column in the payments table to get the cost of orders.  
 
-```{sql eval=FALSE, connection=target_db, include=FALSE}
-SELECT d3.yearly_payment_value as 2017_payment_value,
-       d3.lead_ as 2018_payment_value,
-       ROUND((d3.diff/d3.yearly_payment_value) * 100, 2) 
-          as 2017_to_2018_percentage_increase
-FROM
-(
-SELECT d2.year, d2.yearly_payment_value,
-       LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) AS lead_,
-       ((LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) 
-        - d2.yearly_payment_value)) as diff
-       
-       
-FROM
-(SELECT DISTINCT d.year,
-       SUM(d.payment_value) OVER (PARTITION BY d.year) as yearly_payment_value
-FROM
-(SELECT EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
-       p.payment_value
-FROM orders as o
-JOIN payments as p
-ON o.order_id = p.order_id
-WHERE (o.order_purchase_timestamp BETWEEN '2017-01-01' AND '2017-08-31')
-      OR (o.order_purchase_timestamp BETWEEN '2018-01-01' AND '2018-08-31')
-) AS d
-) AS d2
-) AS d3
-WHERE d3.lead_ IS NOT NULL;
-```
-
 ```{sql, connection=target_db}
 WITH d AS (SELECT EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
        p.payment_value
@@ -476,6 +445,42 @@ WITH d AS (SELECT EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
        ON o.order_id = p.order_id
        WHERE (o.order_purchase_timestamp BETWEEN '2017-01-01' AND '2017-08-31')
          OR (o.order_purchase_timestamp BETWEEN '2018-01-01' AND '2018-08-31')),
+      
+    d2 AS (SELECT DISTINCT d.year,
+       SUM(d.payment_value) OVER (PARTITION BY d.year) as yearly_payment_value
+       FROM d),
+
+    d3 AS (SELECT d2.year, d2.yearly_payment_value,
+           LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) 
+              AS lead_,
+           ((LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) 
+             - d2.yearly_payment_value)) as diff
+           FROM d2)
+           
+SELECT d3.yearly_payment_value as 2017_payment_value,
+       d3.lead_ as 2018_payment_value,
+       ROUND((d3.diff/d3.yearly_payment_value) * 100, 2) 
+          as 2017_to_2018_percentage_increase
+FROM d3
+WHERE d3.lead_ IS NOT NULL;
+```
+Analyzing the *order_status* we find the following status. Including or excluding orders with certain status will change the percentage increase.
+
+```{sql, connection=target_db}
+SELECT DISTINCT order_status FROM orders;
+```
+
+Foe example, excluding the orders with *canceled* status changes the results as follows:
+
+```{sql, connection=target_db}
+WITH d AS (SELECT EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
+       p.payment_value
+       FROM orders as o
+       JOIN payments as p
+       ON o.order_id = p.order_id
+       WHERE ((o.order_purchase_timestamp BETWEEN '2017-01-01' AND '2017-08-31')
+         OR (o.order_purchase_timestamp BETWEEN '2018-01-01' AND '2018-08-31'))
+         AND (o.order_status <> "canceled")),
       
     d2 AS (SELECT DISTINCT d.year,
        SUM(d.payment_value) OVER (PARTITION BY d.year) as yearly_payment_value
@@ -1382,3 +1387,14 @@ ggplot(sales_dataAll, aes(x = day, y = order_count)) +
 ```{r closeconnection, include=FALSE}
 dbDisconnect(target_db)
 ```
+
+____________________________________________________________________________________________________________________________________________________
+
+**Programming environment for analysis of the dataset is as follows**
+
+1. RStudio for markdown and plotting.  
+2. MySQL as database server.  
+3. Docker for hosting RStudio and MySQL server.  
+4. Link to the [GitHub Repository for the case study](https://github.com/shayantandey/Scaler-DS-ML/tree/main/Business%20Case%20-%20SQL/Target%20Dataset).
+
+____________________________________________________________________________________________________________________________________________________
