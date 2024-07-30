@@ -256,10 +256,10 @@ ORDER BY year_of_orders;
 Trend for 2016 does not show conclusive evidence of a growing trend.
 
 ```{sql, connection=target_db}
-SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2016") as month,
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2016") AS month,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
           AS order_count,
-       MONTH(order_purchase_timestamp) as month_number
+       MONTH(order_purchase_timestamp) AS month_number
 FROM orders
 WHERE YEAR(order_purchase_timestamp) = 2016
 ORDER BY MONTH(order_purchase_timestamp);
@@ -268,10 +268,10 @@ ORDER BY MONTH(order_purchase_timestamp);
 Trend for 2017 shows growth in month-on-month sale throughout the year.
 
 ```{sql, connection=target_db}
-SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2017") as month,
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2017") AS month,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count,
-       MONTH(order_purchase_timestamp) as month_number
+       MONTH(order_purchase_timestamp) AS month_number
 FROM orders
 WHERE YEAR(order_purchase_timestamp) = 2017
 ORDER BY MONTH(order_purchase_timestamp);
@@ -280,10 +280,10 @@ ORDER BY MONTH(order_purchase_timestamp);
 Trend for 2018 shows growth in month-on-month sale throughout the year.
 
 ```{sql, connection=target_db}
-SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2018") as month,
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2018") AS month,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count,
-       MONTH(order_purchase_timestamp) as month_number
+       MONTH(order_purchase_timestamp) AS month_number
 FROM orders
 WHERE YEAR(order_purchase_timestamp) = 2018
 ORDER BY MONTH(order_purchase_timestamp);
@@ -303,9 +303,9 @@ FROM orders;
 Highest monthly sales in the given data is as follows, but it fails to show any seasonal trend:
 
 ```{sql, connection=target_db}
-SELECT YEAR(order_purchase_timestamp) as year,
-       MONTHNAME(order_purchase_timestamp) as month,
-       COUNT(*) as order_count
+SELECT YEAR(order_purchase_timestamp) AS year,
+       MONTHNAME(order_purchase_timestamp) AS month,
+       COUNT(*) AS order_count
 FROM orders
 GROUP BY year, month
 ORDER BY order_count DESC;
@@ -314,8 +314,8 @@ ORDER BY order_count DESC;
 While checking the year-wise monthly sales data, we do not see any monthly seasonality:
 
 ```{sql, connection=target_db}
-SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2016") as month,
-       MONTH(order_purchase_timestamp) as month_number,
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2016") AS month,
+       MONTH(order_purchase_timestamp) AS month_number,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count
 FROM orders
@@ -324,8 +324,8 @@ ORDER BY order_count DESC;
 ```
 
 ```{sql, connection=target_db}
-SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2017") as month,
-       MONTH(order_purchase_timestamp) as month_number,
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2017") AS month,
+       MONTH(order_purchase_timestamp) AS month_number,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count
 FROM orders
@@ -334,8 +334,8 @@ ORDER BY order_count DESC;
 ```
 
 ```{sql, connection=target_db}
-SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2018") as month,
-       MONTH(order_purchase_timestamp) as month_number,
+SELECT DISTINCT CONCAT(MONTHNAME(order_purchase_timestamp), " ", "2018") AS month,
+       MONTH(order_purchase_timestamp) AS month_number,
        COUNT(order_id) OVER (PARTITION BY MONTH(order_purchase_timestamp))
         AS order_count
 FROM orders
@@ -400,8 +400,8 @@ SELECT c.customer_state,
     MONTHNAME(o.order_purchase_timestamp) AS month_name,
     EXTRACT(MONTH FROM o.order_purchase_timestamp) AS month_number,
     COUNT(o.order_id) AS order_count
-FROM customers as c
-JOIN orders as o
+FROM customers AS c
+JOIN orders AS o
 ON c.customer_id = o.customer_id
 GROUP By c.customer_state,
     EXTRACT(YEAR FROM o.order_purchase_timestamp),
@@ -440,27 +440,27 @@ You can use the "payment_value" column in the payments table to get the cost of 
 ```{sql, connection=target_db}
 WITH d AS (SELECT EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
        p.payment_value
-       FROM orders as o
-       JOIN payments as p
+       FROM orders AS o
+       JOIN payments AS p
        ON o.order_id = p.order_id
        WHERE (o.order_purchase_timestamp BETWEEN '2017-01-01' AND '2017-08-31')
          OR (o.order_purchase_timestamp BETWEEN '2018-01-01' AND '2018-08-31')),
       
     d2 AS (SELECT DISTINCT d.year,
-       SUM(d.payment_value) OVER (PARTITION BY d.year) as yearly_payment_value
+       SUM(d.payment_value) OVER (PARTITION BY d.year) AS yearly_payment_value
        FROM d),
 
     d3 AS (SELECT d2.year, d2.yearly_payment_value,
            LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) 
               AS lead_,
            ((LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) 
-             - d2.yearly_payment_value)) as diff
+             - d2.yearly_payment_value)) AS diff
            FROM d2)
            
-SELECT d3.yearly_payment_value as 2017_payment_value,
-       d3.lead_ as 2018_payment_value,
+SELECT d3.yearly_payment_value AS 2017_payment_value,
+       d3.lead_ AS 2018_payment_value,
        ROUND((d3.diff/d3.yearly_payment_value) * 100, 2) 
-          as 2017_to_2018_percentage_increase
+          AS 2017_to_2018_percentage_increase
 FROM d3
 WHERE d3.lead_ IS NOT NULL;
 ```
@@ -475,28 +475,28 @@ Foe example, excluding the orders with *canceled* status changes the results as 
 ```{sql, connection=target_db}
 WITH d AS (SELECT EXTRACT(YEAR FROM o.order_purchase_timestamp) AS year,
        p.payment_value
-       FROM orders as o
-       JOIN payments as p
+       FROM orders AS o
+       JOIN payments AS p
        ON o.order_id = p.order_id
        WHERE ((o.order_purchase_timestamp BETWEEN '2017-01-01' AND '2017-08-31')
          OR (o.order_purchase_timestamp BETWEEN '2018-01-01' AND '2018-08-31'))
          AND (o.order_status <> "canceled")),
       
     d2 AS (SELECT DISTINCT d.year,
-       SUM(d.payment_value) OVER (PARTITION BY d.year) as yearly_payment_value
+       SUM(d.payment_value) OVER (PARTITION BY d.year) AS yearly_payment_value
        FROM d),
 
     d3 AS (SELECT d2.year, d2.yearly_payment_value,
            LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) 
               AS lead_,
            ((LEAD(d2.yearly_payment_value) OVER(ORDER BY d2.yearly_payment_value) 
-             - d2.yearly_payment_value)) as diff
+             - d2.yearly_payment_value)) AS diff
            FROM d2)
            
-SELECT d3.yearly_payment_value as 2017_payment_value,
-       d3.lead_ as 2018_payment_value,
+SELECT d3.yearly_payment_value AS 2017_payment_value,
+       d3.lead_ AS 2018_payment_value,
        ROUND((d3.diff/d3.yearly_payment_value) * 100, 2) 
-          as 2017_to_2018_percentage_increase
+          AS 2017_to_2018_percentage_increase
 FROM d3
 WHERE d3.lead_ IS NOT NULL;
 ```
@@ -512,7 +512,7 @@ SELECT DISTINCT c.customer_state,
 FROM customers AS c
 JOIN orders AS o
 ON c.customer_id = o.customer_id
-JOIN payments as p
+JOIN payments AS p
 ON o.order_id = p.order_id
 ORDER BY c.customer_state;
 ```
@@ -587,7 +587,7 @@ WHERE DATEDIFF(order_delivered_customer_date, order_estimated_delivery_date) >= 
 
 ```{sql, connection=target_db}
 SELECT DISTINCT c.customer_state,
-       AVG(oi.freight_value) OVER (PARTITION BY c.customer_state) as highest_5_avg
+       AVG(oi.freight_value) OVER (PARTITION BY c.customer_state) AS highest_5_avg
 FROM order_items AS oi
 JOIN orders AS o
 ON oi.order_id = o.order_id
@@ -598,7 +598,7 @@ LIMIT 5;
 ```
 ```{sql, connection=target_db}
 SELECT DISTINCT c.customer_state,
-       AVG(oi.freight_value) OVER (PARTITION BY c.customer_state) as lowest_5_avg
+       AVG(oi.freight_value) OVER (PARTITION BY c.customer_state) AS lowest_5_avg
 FROM order_items AS oi
 JOIN orders AS o
 ON oi.order_id = o.order_id
@@ -613,7 +613,7 @@ LIMIT 5;
 ```{sql, connection=target_db}
 SELECT DISTINCT c.customer_state,
        AVG(DATEDIFF(order_delivered_customer_date, order_purchase_timestamp)) 
-          OVER (PARTITION BY c.customer_state) as highest_5_avg
+          OVER (PARTITION BY c.customer_state) AS highest_5_avg
 FROM orders AS o
 JOIN customers AS c
 ON o.customer_id = c.customer_id
@@ -624,7 +624,7 @@ LIMIT 5;
 ```{sql, connection=target_db}
 SELECT DISTINCT c.customer_state,
        AVG(DATEDIFF(order_delivered_customer_date, order_purchase_timestamp)) 
-          OVER (PARTITION BY c.customer_state) as lowest_5_avg
+          OVER (PARTITION BY c.customer_state) AS lowest_5_avg
 FROM orders AS o
 JOIN customers AS c
 ON o.customer_id = c.customer_id
@@ -638,7 +638,7 @@ You can use the difference between the averages of actual & estimated delivery d
 ```{sql, connection=target_db}
 SELECT DISTINCT c.customer_state,
        AVG(DATEDIFF(order_estimated_delivery_date, order_delivered_customer_date)) 
-          OVER (PARTITION BY c.customer_state) as top_5_fastest_delivery
+          OVER (PARTITION BY c.customer_state) AS top_5_fastest_delivery
 FROM orders AS o
 JOIN customers AS c
 ON o.customer_id = c.customer_id
@@ -653,7 +653,7 @@ LIMIT 5;
 The various payment types in the dataset is as follows:
 
 ```{sql, connection=target_db}
-SELECT DISTINCT payment_type, COUNT(payment_type) as count_payment_type
+SELECT DISTINCT payment_type, COUNT(payment_type) AS count_payment_type
 FROM payments
 GROUP BY payment_type
 HAVING payment_type <> "not_defined"
@@ -662,7 +662,7 @@ HAVING payment_type <> "not_defined"
 Payment type is not defined for 3 entries in the dataset.
 
 ```{sql, connection=target_db}
-SELECT payment_type, COUNT(payment_type) as count_payment_type
+SELECT payment_type, COUNT(payment_type) AS count_payment_type
 FROM payments
 GROUP BY payment_type
 HAVING payment_type = "not_defined"
